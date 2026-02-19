@@ -1,5 +1,9 @@
 # OpenClaw + 企业微信 + Vercel 部署指南
 
+> 当前电脑配置完成后，可迁移到其他电脑运行
+
+---
+
 ## 方案架构
 
 ```
@@ -11,64 +15,68 @@
                     Webhook URL
                           │
                    ┌──────▼──────┐
-                   │   你的电脑   │
-                   │  OpenClaw    │
+                   │   电脑A     │
+                   │  OpenClaw   │ ← 当前电脑
                    └─────────────┘
+                            │
+                     迁移到电脑B
 ```
-
-## 准备工作
-
-### 1. 域名要求
-- 已在国内备案的域名
-- 已解析到你的服务器/VPS
-
-### 2. 服务器
-- 一台长期开机的电脑/VPS
-- 安装 Node.js 18+
-
-### 3. 企业微信
-- 企业微信管理员账号
-- 创建一个自建应用
 
 ---
 
-## 第一部分：服务器配置
+## 准备工作清单
 
-### 1.1 安装 Node.js
+| 序号 | 项目 | 状态 | 备注 |
+|------|------|------|------|
+| 1 | 备案域名 | ✅ 已准备 | |
+| 2 | 企业微信管理员 | ✅ 已准备 | |
+| 3 | Node.js 18+ | ⏳ 待确认 | 当前电脑检查 |
+| 4 | OpenClaw | ⏳ 待确认 | 当前电脑检查 |
+
+---
+
+## 第一步：检查当前电脑环境
+
+### 1.1 检查 Node.js
 
 ```bash
-# Ubuntu/Debian
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-# 验证
 node -v
 npm -v
 ```
 
-### 1.2 安装 OpenClaw
+**预期结果**：显示版本号，如 `v18.x.x`
+
+### 1.2 检查 OpenClaw
 
 ```bash
-# 安装
-npm install -g clawdbot@latest
-
-# 初始化
-clawdbot onboard --install-daemon
+openclaw gateway status
 ```
 
-### 1.3 安装企业微信插件
+**预期结果**：显示运行状态
+
+### 1.3 检查企业微信插件
 
 ```bash
-# 安装插件
+openclaw plugins list
+```
+
+---
+
+## 第二步：安装企业微信插件
+
+### 2.1 安装插件
+
+```bash
+# 安装企业微信插件（二选一）
 openclaw plugins install @sunnoy/wecom
 
 # 或
 openclaw plugins install @yanhaidao/wecom
 ```
 
-### 1.4 配置 OpenClaw
+### 2.2 配置插件
 
-编辑 `~/.openclaw/openclaw.json`：
+编辑配置文件 `~/.openclaw/openclaw.json`：
 
 ```json
 {
@@ -82,154 +90,15 @@ openclaw plugins install @yanhaidao/wecom
   "channels": {
     "wecom": {
       "enabled": true,
-      "token": "你的Token",
-      "encodingAesKey": "你的EncodingAESKey(43位)",
-      "adminUsers": ["你的用户ID"],
-      "commands": {
-        "enabled": true,
-        "allowlist": ["/new", "/status", "/help", "/compact"]
-      }
+      "token": "请在企业微信后台获取",
+      "encodingAesKey": "请在企业微信后台获取（43位）",
+      "adminUsers": ["你的用户ID"]
     }
   }
 }
 ```
 
-### 1.5 启动 OpenClaw
-
-```bash
-# 启动
-openclaw gateway start
-
-# 检查状态
-openclaw gateway status
-```
-
----
-
-## 第二部分：Vercel 配置
-
-### 2.1 创建 Vercel 项目
-
-1. 登录 [Vercel](https://vercel.com)
-2. 创建新项目，导入 `openclaw/openclaw`
-3. 配置环境变量
-
-### 2.2 配置环境变量
-
-```env
-# 必填
-OPENCLAW_SECRET=你的密钥
-
-# 可选
-MODEL_PROVIDER=deepseek
-MODEL_NAME=deepseek-chat
-```
-
-### 2.3 绑定自有域名
-
-1. 在 Vercel 项目中进入 Settings → Domains
-2. 添加你的域名
-3. 按照提示配置 DNS 记录
-
----
-
-## 第三部分：企业微信配置
-
-### 3.1 创建应用
-
-1. 登录 [企业微信管理后台](https://work.weixin.qq.com/)
-2. 进入「应用管理」→「创建应用」
-3. 选择「自建应用」
-4. 填写应用信息
-
-### 3.2 配置可信域名
-
-1. 在应用详情页找到「可信域名」
-2. 添加你的域名（例如：`yourdomain.com`）
-3. 下载验证文件上传到域名根目录
-
-### 3.3 配置接收消息
-
-1. 在应用详情页找到「API接收消息」
-2. 配置以下内容：
-
-| 配置项 | 值 |
-|--------|-----|
-| URL | `https://yourdomain.com/webhooks/wecom` |
-| Token | `与OpenClaw配置一致` |
-| EncodingAESKey | `与OpenClaw配置一致` |
-
-### 3.4 获取应用凭证
-
-在应用详情页获取：
-- AgentId（应用ID）
-- Secret（应用密钥）
-
----
-
-## 第四部分：连接配置
-
-### 4.1 配置 Webhook 中转（可选）
-
-如果 Vercel 无法直接访问本地 OpenClaw，需要中转：
-
-```javascript
-// Vercel 函数 /api/wecom.js
-export default async function handler(req, res) {
-  const response = await fetch('http://你的服务器IP:3000/webhooks/wecom', {
-    method: 'POST',
-    body: JSON.stringify(req.body),
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  });
-  
-  const data = await response.json();
-  res.status(200).json(data);
-}
-```
-
-### 4.2 更新企业微信回调地址
-
-企业微信回调地址改为：
-```
-https://yourdomain.com/api/wecom
-```
-
----
-
-## 第五部分：测试
-
-### 5.1 测试企业微信连接
-
-```bash
-# 在企业微信中向应用发送消息
-# 应该能收到自动回复
-```
-
-### 5.2 测试 OpenClaw 功能
-
-```bash
-# 检查日志
-openclaw gateway logs
-
-# 测试发送消息
-```
-
----
-
-## 常见问题
-
-### Q1: 企业微信提示 URL 无效
-- 确认可信域名已正确配置
-- 确认验证文件可访问
-
-### Q2: 消息收不到
-- 检查服务器防火墙
-- 检查 Vercel 日志
-- 确认 Token 一致
-
-### Q3: 如何重启 OpenClaw
+### 2.3 重启 OpenClaw
 
 ```bash
 openclaw gateway restart
@@ -237,20 +106,163 @@ openclaw gateway restart
 
 ---
 
-## 文件结构
+## 第三步：配置企业微信应用
 
-```
-wechat-openclaw/
-├── SETUP_GUIDE.md      # 本指南
-├── docker-compose.yml   # Docker部署（可选）
-└── .env.example         # 环境变量示例
+### 3.1 登录企业微信后台
+
+访问：https://work.weixin.qq.com/
+
+### 3.2 创建自建应用
+
+1. 进入「应用管理」→「创建应用」
+2. 选择「自建应用」
+3. 填写应用名称（如：AI助手）
+4. 上传应用图标
+
+### 3.3 配置可信域名
+
+1. 在应用详情页找到「可信域名」
+2. 添加你的域名
+3. 下载验证文件
+
+### 3.4 配置 API 接收消息
+
+| 配置项 | 值 | 说明 |
+|--------|-----|------|
+| URL | `https://你的域名/webhooks/wecom` | 需先配置Vercel |
+| Token | 随机字符串 | 记录下来 |
+| EncodingAESKey | 43位随机字符串 | 点击生成并记录 |
+
+### 3.5 获取应用凭证
+
+| 凭证 | 位置 | 用途 |
+|------|------|------|
+| AgentId | 应用详情页 | 应用ID |
+| Secret | 应用详情页 | 应用密钥 |
+
+---
+
+## 第四步：配置 Vercel
+
+### 4.1 创建 Vercel 项目
+
+1. 登录 [Vercel](https://vercel.com)
+2. 新建项目，导入 `openclaw/openclaw`
+
+### 4.2 配置环境变量
+
+| 变量名 | 值 |
+|--------|-----|
+| OPENCLAW_SECRET | 随机密钥 |
+
+### 4.3 绑定自有域名
+
+1. Settings → Domains
+2. 添加你的域名
+3. 按提示配置 DNS
+
+---
+
+## 第五步：连接测试
+
+### 5.1 测试企业微信发送消息
+
+在企业微信中向应用发送一条消息
+
+### 5.2 检查 OpenClaw 日志
+
+```bash
+openclaw gateway logs
 ```
 
 ---
 
-## 下一步
+## 配置文件备份（重要）
 
-完成以上配置后，你可以通过企业微信与 OpenClaw 沟通了！
+配置完成后，备份以下文件：
+
+```bash
+# 备份 OpenClaw 配置
+cp ~/.openclaw/openclaw.json ./backup/openclaw_wecom.json
+
+# 导出插件
+openclaw plugins export
+```
+
+---
+
+## 迁移到其他电脑
+
+当需要迁移到其他电脑时：
+
+### 1. 导出配置
+
+```bash
+# 在当前电脑执行
+cp ~/.openclaw/openclaw.json ~/wechat-openclaw-config/
+```
+
+### 2. 导入配置
+
+```bash
+# 在新电脑执行
+# 1. 安装 Node.js
+# 2. 安装 OpenClaw
+# 3. 安装企业微信插件
+# 4. 复制配置到 ~/.openclaw/openclaw.json
+# 5. 重启 OpenClaw
+```
+
+### 3. 检查项
+
+| 项目 | 新电脑检查 |
+|------|-----------|
+| Node.js 版本 | `node -v` |
+| OpenClaw 状态 | `openclaw gateway status` |
+| 企业微信连接 | 发送测试消息 |
+
+---
+
+## 常见问题
+
+### Q1: 企业微信提示 URL 无效
+- 确认域名已解析到 Vercel
+- 确认可信域名已添加
+- 验证文件可访问
+
+### Q2: 消息收不到
+- 检查 OpenClaw 日志
+- 确认 Token 和 EncodingAESKey 一致
+
+### Q3: 如何查看日志
+
+```bash
+openclaw gateway logs -f
+```
+
+---
+
+## 快速命令参考
+
+```bash
+# 启动
+openclaw gateway start
+
+# 停止
+openclaw gateway stop
+
+# 重启
+openclaw gateway restart
+
+# 状态
+openclaw gateway status
+
+# 日志
+openclaw gateway logs -f
+
+# 插件列表
+openclaw plugins list
+```
 
 ---
 
