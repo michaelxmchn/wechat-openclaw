@@ -1,0 +1,14 @@
+{
+  "channels": {
+    "wecom": {
+      "enabled": true,
+      "token": "【请填入Token-在企业微信后台生成】",
+      "encodingAesKey": "【请填入EncodingAESKey-43位-在企业微信后台生成】",
+      "adminUsers": ["【请填入你的用户ID】"],
+      "commands": {
+        "enabled": true,
+        "allowlist": ["/new", "/status", "/help", "/compact"]
+      }
+    }
+  }
+}

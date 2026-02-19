@@ -267,3 +267,90 @@ openclaw plugins list
 ---
 
 *文档更新时间: 2026-02-19*
+
+---
+
+## 第六步：Vercel 配置（URL解决方案）
+
+### 方案说明
+
+由于企业微信需要可访问的URL，需要通过Vercel中转：
+
+```
+企业微信 → Vercel域名 → 你的服务器 → OpenClaw
+```
+
+### 6.1 Vercel 部署
+
+1. 登录 Vercel
+2. 新建项目，导入：`https://github.com/openclaw/openclaw`
+3. 配置环境变量：
+
+| 变量 | 值 |
+|------|-----|
+| OPENCLAW_SECRET | 随机字符串（如：abcd1234） |
+
+### 6.2 绑定自有域名
+
+1. Settings → Domains
+2. 添加你的域名（如：ai.yourdomain.com）
+3. 按提示配置DNS
+
+### 6.3 配置中转（关键步骤）
+
+创建 Vercel 函数 `/api/wecom.ts`：
+
+```typescript
+// api/wecom.ts
+export default async function handler(req, res) {
+  // 将请求转发到本地OpenClaw
+  const response = await fetch('http://你的服务器IP:18789/webhooks/wecom', {
+    method: req.method,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-OpenClaw-Secret': process.env.OPENCLAW_SECRET
+    },
+    body: JSON.stringify(req.body)
+  });
+  
+  const data = await response.json();
+  res.status(200).json(data);
+}
+```
+
+### 6.4 企业微信回调地址
+
+最终企业微信配置的URL为：
+```
+https://你的域名.com/api/wecom
+```
+
+---
+
+## 第七步：完整配置示例
+
+### OpenClaw 配置（最终版）
+
+```json
+{
+  "channels": {
+    "wecom": {
+      "enabled": true,
+      "token": "你生成的Token",
+      "encodingAesKey": "你生成的EncodingAESKey(43位)",
+      "adminUsers": ["你的用户ID"]
+    }
+  }
+}
+```
+
+### 你需要填写的信息
+
+| 字段 | 来源 | 示例值 |
+|------|------|--------|
+| token | 企业微信后台生成 | MySecretToken123 |
+| encodingAesKey | 企业微信后台生成 | abcdefghijklmnopqrstuvwxyzABCDEFGHIJKL |
+| adminUsers | 企业微信用户ID | zhangsan |
+| Vercel域名 | 你绑定的域名 | ai.yourdomain.com |
+| OPENCLAW_SECRET | 你生成的密钥 | abcd1234 |
+
